@@ -1,33 +1,19 @@
 const express = require("express");
-const bodyParser = require("body-parser");
-const admin = require("firebase-admin");
 const app = express();
 
-app.use(bodyParser.json());
+app.use(express.json());
 
-// Initialize Firebase
-const serviceAccount = require("./serviceAccountKey.json");
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
-const db = admin.firestore();
+// In-memory ticket storage (resets if server restarts)
+const tickets = {};
 
 // Utility to detect language
 function getLanguage(req) {
   return req.body.queryResult.languageCode || "en";
 }
 
-// Utility to format response in Dialogflow
+// Utility to create response
 function createResponse(text) {
-  return {
-    fulfillmentMessages: [
-      {
-        text: {
-          text: [text]
-        }
-      }
-    ]
-  };
+  return { fulfillmentMessages: [{ text: { text: [text] } }] };
 }
 
 // Generate random ticket ID
@@ -35,73 +21,68 @@ function generateTicketID() {
   return Math.floor(1000 + Math.random() * 9000); // 4-digit ID
 }
 
-// Main webhook endpoint
-app.post("/webhook", async (req, res) => {
-  const intent = req.body.queryResult.intent.displayName;
+// Webhook endpoint
+app.post("/webhook", (req, res) => {
+  console.log("Incoming request:");
+  console.log(JSON.stringify(req.body, null, 2));
+
+  const intentName = req.body.queryResult.intent.displayName;
   const language = getLanguage(req);
-  const params = req.body.queryResult.parameters;
+  let responseText = "";
 
-  try {
-    if (intent === "PRIO.Create_Support_Ticket") {
-      // Create ticket
-      const ticket_id = generateTicketID();
-      const ticketData = {
-        ticket_id,
-        category: params.category || "General",
-        description: params.description || "",
-        contact: params.contact || "",
-        status: "Open",
-        createdAt: new Date().toISOString()
-      };
-
-      await db.collection("tickets").doc(ticket_id.toString()).set(ticketData);
-
-      let responseText = language.startsWith("sv")
-        ? `Perfekt. Jag skickar in ärendet nu… Ärende-ID: ${ticket_id}`
-        : `Perfect. I’m submitting your ticket now… Ticket ID: ${ticket_id}`;
-
-      return res.json(createResponse(responseText));
-    }
-
-    else if (intent === "Ticket.Check_Status") {
-      let ticket_id = params.ticket_id;
-      if (!ticket_id) {
-        // Ask for ticket ID if missing
-        let promptText = language.startsWith("sv") ? "Vilket ärende-ID?" : "Which ticket ID?";
-        return res.json(createResponse(promptText));
-      }
-
-      const ticketDoc = await db.collection("tickets").doc(ticket_id.toString()).get();
-      if (!ticketDoc.exists) {
-        let notFoundText = language.startsWith("sv")
-          ? `Hittade inget ärende med ID ${ticket_id}`
-          : `No ticket found with ID ${ticket_id}`;
-        return res.json(createResponse(notFoundText));
-      }
-
-      const ticket = ticketDoc.data();
-      let statusText = language.startsWith("sv")
-        ? `Status på ärende ${ticket_id}: ${ticket.status}`
-        : `Status of ticket ${ticket_id}: ${ticket.status}`;
-
-      return res.json(createResponse(statusText));
-    }
-
-    else {
-      // Default fallback
-      return res.json(createResponse("Sorry, I did not understand that."));
-    }
-  } catch (error) {
-    console.error("Webhook error:", error);
-    let errText = language.startsWith("sv")
-      ? "Oj, något gick fel. Försök igen senare."
-      : "Oops, something went wrong. Please try again later.";
-    return res.json(createResponse(errText));
+  if (intentName === "PRIO.Create_Support_Ticket") {
+    responseText = language.startsWith("sv")
+      ? "Vill du bekräfta ärendet?"
+      : "Do you want to confirm the ticket?";
   }
+
+  else if (intentName === "Ticket.Confirm_Details") {
+    const ticketId = generateTicketID();
+
+    // Store ticket in memory
+    tickets[ticketId] = {
+      status: "Open",
+      createdAt: new Date().toISOString()
+    };
+
+    responseText = language.startsWith("sv")
+      ? `Perfekt. Jag skickar in ärendet nu… Ärende-ID: ${ticketId}`
+      : `Perfect. I am submitting the ticket now… Ticket ID: ${ticketId}`;
+  }
+
+  else if (intentName === "Ticket.Check_Status") {
+    const ticketId = req.body.queryResult.parameters.ticket_id;
+
+    if (!ticketId) {
+      responseText = language.startsWith("sv")
+        ? "Vilket ärende-ID?"
+        : "Which ticket ID?";
+    } else if (!tickets[ticketId]) {
+      responseText = language.startsWith("sv")
+        ? `Hittade inget ärende med ID ${ticketId}`
+        : `No ticket found with ID ${ticketId}`;
+    } else {
+      responseText = language.startsWith("sv")
+        ? `Status på ärende ${ticketId}: ${tickets[ticketId].status}`
+        : `Status of ticket ${ticketId}: ${tickets[ticketId].status}`;
+    }
+  }
+
+  else {
+    responseText = language.startsWith("sv")
+      ? "Jag förstod inte det. Kan du försöka igen?"
+      : "Sorry, I did not understand that. Please try again.";
+  }
+
+  res.json(createResponse(responseText));
 });
 
-// Start server
+// Health check
+app.get("/", (req, res) => {
+  res.send("Server is running");
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Webhook server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
