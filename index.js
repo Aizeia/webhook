@@ -26,73 +26,75 @@ app.post("/webhook", (req, res) => {
   // CREATE TICKET (STEP 1)
   // ==============================
   if (intentName === "PRIO_Create_Support_Ticket") {
-    const issue = params.issue_summary;
-let category = params.issue_category;
+  const issue = params.issue_summary;
+  let category = params.issue_category;
 
-if (!category && issue) {
-  const lowerIssue = issue.toLowerCase();
+  if (!category && issue) {
+    const lowerIssue = issue.toLowerCase();
 
-  if (lowerIssue.includes("log") || lowerIssue.includes("password")) {
-    category = "login";
-  } 
-  else if (lowerIssue.includes("invoice") || lowerIssue.includes("faktura")) {
-    category = "invoice";
-  } 
-  else if (lowerIssue.includes("access") || lowerIssue.includes("behörighet")) {
-    category = "access";
-  } 
-  else if (lowerIssue.includes("purchase") || lowerIssue.includes("inköp")) {
-    category = "purchase";
-  } 
-  else {
-    category = "other";
-  }
-}
-    if (!issue) {
-      responseText = language.startsWith("sv")
-        ? "Vad gäller ärendet?"
-        : "What is the issue about?";
-      return res.json(createResponse(responseText));
+    if (lowerIssue.includes("log") || lowerIssue.includes("password")) {
+      category = "login";
+    } 
+    else if (lowerIssue.includes("invoice") || lowerIssue.includes("faktura")) {
+      category = "invoice";
+    } 
+    else if (lowerIssue.includes("access") || lowerIssue.includes("behörighet")) {
+      category = "access";
+    } 
+    else if (lowerIssue.includes("purchase") || lowerIssue.includes("inköp")) {
+      category = "purchase";
+    } 
+    else {
+      category = "other";
     }
-
-    responseText = language.startsWith("sv")
-      ? `Du beskrev problemet som: "${issue}". Kategori: "${category || "övrigt"}". Vill du bekräfta ärendet?`
-      : `You described the issue as: "${issue}". Category: "${category || "other"}". Do you want to confirm the ticket?`;
   }
+
+  if (!issue) {
+    responseText = language.startsWith("sv")
+      ? "Vad gäller ärendet?"
+      : "What is the issue about?";
+    return res.json(createResponse(responseText));
+  }
+
+  // ✅ STORE PENDING TICKET
+  tickets["pending"] = {
+    issue: issue,
+    category: category
+  };
+
+  responseText = language.startsWith("sv")
+    ? `Du beskrev problemet som: "${issue}". Kategori: "${category}". Vill du bekräfta ärendet?`
+    : `You described the issue as: "${issue}". Category: "${category}". Do you want to confirm the ticket?`;
+}
 
   // ==============================
   // CONFIRM TICKET
   // ==============================
   else if (intentName === "Ticket.Confirm_Details") {
 
-  const outputContexts = req.body.queryResult.outputContexts;
+  const pending = tickets["pending"];
 
-  let issue = "";
-  let category = "other";
-
-  outputContexts.forEach(ctx => {
-    if (ctx.parameters) {
-      if (ctx.parameters.issue_summary) {
-        issue = ctx.parameters.issue_summary;
-      }
-      if (ctx.parameters.issue_category) {
-        category = ctx.parameters.issue_category;
-      }
-    }
-  });
+  if (!pending) {
+    responseText = language.startsWith("sv")
+      ? "Inget pågående ärende att bekräfta."
+      : "No pending ticket to confirm.";
+    return res.json(createResponse(responseText));
+  }
 
   const ticketId = generateTicketID();
 
   tickets[ticketId] = {
     status: "Open",
-    issue: issue,
-    category: category,
+    issue: pending.issue,
+    category: pending.category,
     createdAt: new Date().toISOString()
   };
 
+  delete tickets["pending"]; // clean up
+
   responseText = language.startsWith("sv")
-    ? `Perfekt. Ärendet "${issue}" har skapats.\nKategori: ${category}\nÄrende-ID: ${ticketId}`
-    : `Perfect. Ticket "${issue}" has been created.\nCategory: ${category}\nTicket ID: ${ticketId}`;
+    ? `Perfekt. Ärendet "${pending.issue}" har skapats.\nKategori: ${pending.category}\nÄrende-ID: ${ticketId}`
+    : `Perfect. Ticket "${pending.issue}" has been created.\nCategory: ${pending.category}\nTicket ID: ${ticketId}`;
 }
 
   // ==============================
