@@ -20,6 +20,13 @@ app.post("/webhook", (req, res) => {
   if (intentName === "PRIO_Create_Support_Ticket") {
   const issue = req.body.queryResult.parameters.issue_summary;
 
+  if (!issue) {
+    responseText = language.startsWith("sv")
+      ? "Vad gäller ärendet?"
+      : "What is the issue about?";
+    return res.json(createResponse(responseText));
+  }
+
   responseText = language.startsWith("sv")
     ? `Du beskrev problemet som: "${issue}". Vill du bekräfta ärendet?`
     : `You described the issue as: "${issue}". Do you want to confirm the ticket?`;
