@@ -27,8 +27,27 @@ app.post("/webhook", (req, res) => {
   // ==============================
   if (intentName === "PRIO_Create_Support_Ticket") {
     const issue = params.issue_summary;
-    const category = params.issue_category;
+let category = params.issue_category;
 
+if (!category && issue) {
+  const lowerIssue = issue.toLowerCase();
+
+  if (lowerIssue.includes("log") || lowerIssue.includes("password")) {
+    category = "login";
+  } 
+  else if (lowerIssue.includes("invoice") || lowerIssue.includes("faktura")) {
+    category = "invoice";
+  } 
+  else if (lowerIssue.includes("access") || lowerIssue.includes("behörighet")) {
+    category = "access";
+  } 
+  else if (lowerIssue.includes("purchase") || lowerIssue.includes("inköp")) {
+    category = "purchase";
+  } 
+  else {
+    category = "other";
+  }
+}
     if (!issue) {
       responseText = language.startsWith("sv")
         ? "Vad gäller ärendet?"
