@@ -65,22 +65,35 @@ if (!category && issue) {
   // ==============================
   else if (intentName === "Ticket.Confirm_Details") {
 
-    const issue = params.issue_summary;
-    const category = params.issue_category || "other";
+  const outputContexts = req.body.queryResult.outputContexts;
 
-    const ticketId = generateTicketID();
+  let issue = "";
+  let category = "other";
 
-    tickets[ticketId] = {
-      status: "Open",
-      issue: issue,
-      category: category,
-      createdAt: new Date().toISOString()
-    };
+  outputContexts.forEach(ctx => {
+    if (ctx.parameters) {
+      if (ctx.parameters.issue_summary) {
+        issue = ctx.parameters.issue_summary;
+      }
+      if (ctx.parameters.issue_category) {
+        category = ctx.parameters.issue_category;
+      }
+    }
+  });
 
-    responseText = language.startsWith("sv")
-      ? `Perfekt. Ärendet "${issue}" har skapats.\nKategori: ${category}\nÄrende-ID: ${ticketId}`
-      : `Perfect. Ticket "${issue}" has been created.\nCategory: ${category}\nTicket ID: ${ticketId}`;
-  }
+  const ticketId = generateTicketID();
+
+  tickets[ticketId] = {
+    status: "Open",
+    issue: issue,
+    category: category,
+    createdAt: new Date().toISOString()
+  };
+
+  responseText = language.startsWith("sv")
+    ? `Perfekt. Ärendet "${issue}" har skapats.\nKategori: ${category}\nÄrende-ID: ${ticketId}`
+    : `Perfect. Ticket "${issue}" has been created.\nCategory: ${category}\nTicket ID: ${ticketId}`;
+}
 
   // ==============================
   // CANCEL
