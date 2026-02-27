@@ -33,6 +33,7 @@ app.post("/webhook", (req, res) => {
       issue = ctx.parameters.issue_summary;
     }
   });
+  
 
   const ticketId = generateTicketID();
   tickets[ticketId] = {
@@ -45,6 +46,13 @@ app.post("/webhook", (req, res) => {
     ? `Perfekt. Ärendet "${issue}" har skapats. Ärende-ID: ${ticketId}`
     : `Perfect. Ticket "${issue}" has been created. Ticket ID: ${ticketId}`;
 }
+
+else if (intentName === "Ticket.Cancel") {
+  responseText = language.startsWith("sv")
+    ? "Okej, ärendet skapades inte. Vill du börja om?"
+    : "Okay, the ticket was not created. Would you like to start again?";
+}
+
   else if (intentName === "Ticket.Check_Status") {
     const ticketId = req.body.queryResult.parameters.ticket_id;
     if (!ticketId) {
