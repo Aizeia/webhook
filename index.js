@@ -17,11 +17,13 @@ app.post("/webhook", (req, res) => {
   const language = req.body.queryResult.languageCode || "en";
   let responseText = "";
 
-  if (intentName === "PRIO.Create_Support_Ticket") {
-    responseText = language.startsWith("sv")
-      ? "Vill du bekräfta ärendet?"
-      : "Do you want to confirm the ticket?";
-  } 
+  if (intentName === "PRIO_Create_Support_Ticket") {
+  const issue = req.body.queryResult.parameters.issue_summary;
+
+  responseText = language.startsWith("sv")
+    ? `Du beskrev problemet som: "${issue}". Vill du bekräfta ärendet?`
+    : `You described the issue as: "${issue}". Do you want to confirm the ticket?`;
+}
   else if (intentName === "Ticket.Confirm_Details") {
     const ticketId = generateTicketID();
     tickets[ticketId] = { status: "Open", createdAt: new Date().toISOString() };
