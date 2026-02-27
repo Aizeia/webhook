@@ -25,12 +25,26 @@ app.post("/webhook", (req, res) => {
     : `You described the issue as: "${issue}". Do you want to confirm the ticket?`;
 }
   else if (intentName === "Ticket.Confirm_Details") {
-    const ticketId = generateTicketID();
-    tickets[ticketId] = { status: "Open", createdAt: new Date().toISOString() };
-    responseText = language.startsWith("sv")
-      ? `Perfekt. Jag skickar in ärendet nu… Ärende-ID: ${ticketId}`
-      : `Perfect. I am submitting the ticket now… Ticket ID: ${ticketId}`;
-  } 
+  const outputContexts = req.body.queryResult.outputContexts;
+  
+  let issue = "";
+  outputContexts.forEach(ctx => {
+    if (ctx.parameters && ctx.parameters.issue_summary) {
+      issue = ctx.parameters.issue_summary;
+    }
+  });
+
+  const ticketId = generateTicketID();
+  tickets[ticketId] = {
+    status: "Open",
+    issue: issue,
+    createdAt: new Date().toISOString()
+  };
+
+  responseText = language.startsWith("sv")
+    ? `Perfekt. Ärendet "${issue}" har skapats. Ärende-ID: ${ticketId}`
+    : `Perfect. Ticket "${issue}" has been created. Ticket ID: ${ticketId}`;
+}
   else if (intentName === "Ticket.Check_Status") {
     const ticketId = req.body.queryResult.parameters.ticket_id;
     if (!ticketId) {
