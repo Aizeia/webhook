@@ -2,7 +2,7 @@ const express = require("express");
 const app = express();
 app.use(express.json());
 
-const tickets = {}; // in-memory storage
+const tickets = {};
 
 function generateTicketID() {
   return Math.floor(1000 + Math.random() * 9000);
@@ -49,8 +49,8 @@ app.post("/webhook", (req, res) => {
 
 else if (intentName === "Ticket.Cancel") {
   responseText = language.startsWith("sv")
-    ? "Okej, ärendet skapades inte. Vill du börja om?"
-    : "Okay, the ticket was not created. Would you like to start again?";
+    ? "Okej, ärendet skapades inte."
+    : "Okay, the ticket was not created.";
     return res.json({
     fulfillmentMessages: [
       { text: { text: [responseText] } }
