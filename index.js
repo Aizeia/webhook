@@ -51,6 +51,12 @@ else if (intentName === "Ticket.Cancel") {
   responseText = language.startsWith("sv")
     ? "Okej, ärendet skapades inte. Vill du börja om?"
     : "Okay, the ticket was not created. Would you like to start again?";
+    return res.json({
+    fulfillmentMessages: [
+      { text: { text: [responseText] } }
+    ],
+    outputContexts: [] 
+  });
 }
 
   else if (intentName === "Ticket.Check_Status") {
