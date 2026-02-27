@@ -9,77 +9,103 @@ function generateTicketID() {
 }
 
 function createResponse(text) {
-  return { fulfillmentMessages: [{ text: { text: [text] } }] };
+  return {
+    fulfillmentMessages: [
+      { text: { text: [text] } }
+    ]
+  };
 }
 
 app.post("/webhook", (req, res) => {
   const intentName = req.body.queryResult.intent.displayName;
   const language = req.body.queryResult.languageCode || "en";
+  const params = req.body.queryResult.parameters;
   let responseText = "";
 
+  // ==============================
+  // CREATE TICKET (STEP 1)
+  // ==============================
   if (intentName === "PRIO_Create_Support_Ticket") {
-  const issue = req.body.queryResult.parameters.issue_summary;
+    const issue = params.issue_summary;
+    const category = params.issue_category;
 
-  if (!issue) {
+    if (!issue) {
+      responseText = language.startsWith("sv")
+        ? "Vad gäller ärendet?"
+        : "What is the issue about?";
+      return res.json(createResponse(responseText));
+    }
+
     responseText = language.startsWith("sv")
-      ? "Vad gäller ärendet?"
-      : "What is the issue about?";
-    return res.json(createResponse(responseText));
+      ? `Du beskrev problemet som: "${issue}". Kategori: "${category || "övrigt"}". Vill du bekräfta ärendet?`
+      : `You described the issue as: "${issue}". Category: "${category || "other"}". Do you want to confirm the ticket?`;
   }
 
-  responseText = language.startsWith("sv")
-    ? `Du beskrev problemet som: "${issue}". Vill du bekräfta ärendet?`
-    : `You described the issue as: "${issue}". Do you want to confirm the ticket?`;
-}
+  // ==============================
+  // CONFIRM TICKET
+  // ==============================
   else if (intentName === "Ticket.Confirm_Details") {
-  const outputContexts = req.body.queryResult.outputContexts;
-  
-  let issue = "";
-  outputContexts.forEach(ctx => {
-    if (ctx.parameters && ctx.parameters.issue_summary) {
-      issue = ctx.parameters.issue_summary;
-    }
-  });
-  
 
-  const ticketId = generateTicketID();
-  tickets[ticketId] = {
-    status: "Open",
-    issue: issue,
-    createdAt: new Date().toISOString()
-  };
+    const issue = params.issue_summary;
+    const category = params.issue_category || "other";
 
-  responseText = language.startsWith("sv")
-    ? `Perfekt. Ärendet "${issue}" har skapats. Ärende-ID: ${ticketId}`
-    : `Perfect. Ticket "${issue}" has been created. Ticket ID: ${ticketId}`;
-}
+    const ticketId = generateTicketID();
 
-else if (intentName === "Ticket.Cancel") {
-  responseText = language.startsWith("sv")
-    ? "Okej, ärendet skapades inte."
-    : "Okay, the ticket was not created.";
+    tickets[ticketId] = {
+      status: "Open",
+      issue: issue,
+      category: category,
+      createdAt: new Date().toISOString()
+    };
+
+    responseText = language.startsWith("sv")
+      ? `Perfekt. Ärendet "${issue}" har skapats.\nKategori: ${category}\nÄrende-ID: ${ticketId}`
+      : `Perfect. Ticket "${issue}" has been created.\nCategory: ${category}\nTicket ID: ${ticketId}`;
+  }
+
+  // ==============================
+  // CANCEL
+  // ==============================
+  else if (intentName === "Ticket.Cancel") {
+    responseText = language.startsWith("sv")
+      ? "Okej, ärendet skapades inte."
+      : "Okay, the ticket was not created.";
+
     return res.json({
-    fulfillmentMessages: [
-      { text: { text: [responseText] } }
-    ],
-    outputContexts: [] 
-  });
-}
+      fulfillmentMessages: [
+        { text: { text: [responseText] } }
+      ],
+      outputContexts: []
+    });
+  }
 
+  // ==============================
+  // CHECK STATUS
+  // ==============================
   else if (intentName === "Ticket.Check_Status") {
-    const ticketId = req.body.queryResult.parameters.ticket_id;
+    const ticketId = params.ticket_id;
+
     if (!ticketId) {
-      responseText = language.startsWith("sv") ? "Vilket ärende-ID?" : "Which ticket ID?";
-    } else if (!tickets[ticketId]) {
+      responseText = language.startsWith("sv")
+        ? "Vilket ärende-ID?"
+        : "Which ticket ID?";
+    }
+    else if (!tickets[ticketId]) {
       responseText = language.startsWith("sv")
         ? `Hittade inget ärende med ID ${ticketId}`
         : `No ticket found with ID ${ticketId}`;
-    } else {
-      responseText = language.startsWith("sv")
-        ? `Status på ärende ${ticketId}: ${tickets[ticketId].status}`
-        : `Status of ticket ${ticketId}: ${tickets[ticketId].status}`;
     }
-  } 
+    else {
+      const ticket = tickets[ticketId];
+      responseText = language.startsWith("sv")
+        ? `Status på ärende ${ticketId}: ${ticket.status}\nKategori: ${ticket.category}`
+        : `Status of ticket ${ticketId}: ${ticket.status}\nCategory: ${ticket.category}`;
+    }
+  }
+
+  // ==============================
+  // FALLBACK
+  // ==============================
   else {
     responseText = language.startsWith("sv")
       ? "Jag förstod inte det. Kan du försöka igen?"
@@ -89,7 +115,6 @@ else if (intentName === "Ticket.Cancel") {
   res.json(createResponse(responseText));
 });
 
-app.get("/", (req, res) => res.send("Server is running"));
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(process.env.PORT || 3000, () =>
+  console.log("Server running")
+);
